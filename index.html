@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Science Apparatus Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 400px;
+        }
+        label {
+            font-weight: bold;
+        }
+        select, input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 8px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Science Apparatus Borrow & Return Form</h2>
+        <form>
+            <label for="teacher_name">Teacher's Name:</label>
+            <input type="text" id="teacher_name" name="teacher_name" required>
+            
+            <label for="date">Date:</label>
+            <input type="date" id="date" name="date" required>
+            
+            <h3>Borrow Apparatus</h3>
+            <label>Select Apparatus to Borrow:</label>
+            <div>
+                <input type="checkbox" name="borrow_apparatus" value="beaker"> Beaker 
+                <input type="number" name="borrow_quantity_beaker" min="1" placeholder="Quantity">
+            </div>
+            <div>
+                <input type="checkbox" name="borrow_apparatus" value="test_tube"> Test Tube 
+                <input type="number" name="borrow_quantity_test_tube" min="1" placeholder="Quantity">
+            </div>
+            <div>
+                <input type="checkbox" name="borrow_apparatus" value="microscope"> Microscope 
+                <input type="number" name="borrow_quantity_microscope" min="1" placeholder="Quantity">
+            </div>
+            <div>
+                <input type="checkbox" name="borrow_apparatus" value="bunsen_burner"> Bunsen Burner 
+                <input type="number" name="borrow_quantity_bunsen_burner" min="1" placeholder="Quantity">
+            </div>
+            <div>
+                <input type="checkbox" name="borrow_apparatus" value="pipette"> Pipette 
+                <input type="number" name="borrow_quantity_pipette" min="1" placeholder="Quantity">
+            </div>
+            
+            <h3>Return Apparatus</h3>
+            <label>Select Apparatus to Return:</label>
+            <div>
+                <input type="checkbox" name="return_apparatus" value="beaker"> Beaker 
+                <input type="number" name="return_quantity_beaker" min="1" placeholder="Quantity">
+            </div>
+            <div>
+                <input type="checkbox" name="return_apparatus" value="test_tube"> Test Tube 
+                <input type="number" name="return_quantity_test_tube" min="1" placeholder="Quantity">
+            </div>
+            <div>
+                <input type="checkbox" name="return_apparatus" value="microscope"> Microscope 
+                <input type="number" name="return_quantity_microscope" min="1" placeholder="Quantity">
+            </div>
+            <div>
+                <input type="checkbox" name="return_apparatus" value="bunsen_burner"> Bunsen Burner 
+                <input type="number" name="return_quantity_bunsen_burner" min="1" placeholder="Quantity">
+            </div>
+            <div>
+                <input type="checkbox" name="return_apparatus" value="pipette"> Pipette 
+                <input type="number" name="return_quantity_pipette" min="1" placeholder="Quantity">
+            </div>
+            
+            <label for="remarks">Remarks:</label>
+            <textarea id="remarks" name="remarks" rows="3"></textarea>
+            
+            <button type="submit">Submit</button>
+        </form>
+    </div>
+</body>
+</html>
