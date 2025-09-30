@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Idioms Quiz Generator</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .question-card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+        .option-label {
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .option-label:hover {
+            background-color: #f0f9ff; /* Blue hover for interaction */
+            border-color: #3b82f6;
+        }
+        .selected-option {
+            background-color: #bfdbfe; /* Light blue for selected */
+        }
+        .correct-answer {
+            background-color: #d1fae5; /* Light green */
+            border-color: #10b981;
+        }
+        .incorrect-answer {
+            background-color: #fee2e2; /* Light red */
+            border-color: #ef4444;
+        }
+        /* Custom spinner for loading state */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #3b82f6;
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex justify-center items-start">
+
+    <div class="container w-full">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-gray-900 mb-2">Idioms Quiz Challenge</h1>
+            <p class="text-lg text-gray-600">Test your knowledge of common English idioms using the Gemini API.</p>
+        </header>
+
+        <!-- Quiz Controls and Generation -->
+        <div id="controls" class="bg-white p-6 rounded-xl question-card mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700">Customize Your Quiz</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <input type="number" id="questionCount" value="5" min="1" max="10" 
+                       class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                       placeholder="Number of Questions">
+                <select id="difficulty" 
+                        class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="easy">Easy</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+                <select id="quizTopic" 
+                        class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="general" selected>General Idioms</option>
+                    <option value="animal">Animal Idioms</option>
+                    <option value="food">Food Idioms</option>
+                    <option value="business">Business Idioms</option>
+                </select>
+            </div>
+            <button id="generateButton" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition duration-200 flex items-center justify-center disabled:opacity-50"
+                    onclick="generateQuiz()">
+                <span id="buttonText">Generate New Quiz</span>
+                <div id="loadingSpinner" class="spinner ml-3 hidden"></div>
+            </button>
+        </div>
+
+        <!-- Quiz Container -->
+        <div id="quizContainer" class="space-y-6">
+            <!-- Questions will be dynamically inserted here -->
+        </div>
+
+        <!-- Submission and Results -->
+        <div id="quizFooter" class="hidden mt-8">
+            <button id="submitButton" 
+                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-xl transition duration-200 disabled:opacity-50"
+                    onclick="submitQuiz()">
+                Submit Answers & View Score
+            </button>
+            <div id="results" class="mt-6 bg-yellow-100 p-6 rounded-xl question-card hidden">
+                <h3 class="text-2xl font-bold text-gray-800 mb-2">Quiz Results</h3>
+                <p id="scoreText" class="text-xl text-gray-700"></p>
+                <div id="sourcesContainer" class="mt-4 text-sm text-gray-600"></div>
+            </div>
+            <div id="errorMessage" class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg hidden" role="alert">
+                <p>An error occurred. Please try again.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        // Global Constants and State
+        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent";
+        const quizContainer = document.getElementById('quizContainer');
+        const submitButton = document.getElementById('submitButton');
+        const generateButton = document.getElementById('generateButton');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const buttonText = document.getElementById('buttonText');
+        const resultsDiv = document.getElementById('results');
+        const quizFooter = document.getElementById('quizFooter');
+        const errorMessageDiv = document.getElementById('errorMessage');
+
+        let quizQuestions = [];
+        let userAnswers = {};
+        let isSubmitted = false;
+
+        // Configuration for the Gemini API call
+        const responseSchema = {
+            type: "ARRAY",
+            description: "A list of multiple-choice quiz questions about English idioms.",
+            items: {
+                type: "OBJECT",
+                properties: {
+                    question: { type: "STRING", description: "The idiom or the question text." },
+                    options: { 
+                        type: "ARRAY", 
+                        description: "Four possible meanings or options.",
+                        items: { type: "STRING" }
+                    },
+                    answer: { type: "STRING", description: "The correct option text." },
+                    explanation: { type: "STRING", description: "A brief explanation of the idiom's meaning." }
+                },
+                propertyOrdering: ["question", "options", "answer", "explanation"]
+            }
+        };
+
+        const systemPrompt = "You are an expert quiz master specializing in English language and idioms. Your task is to generate a quiz based on the user's request. Always format your output as a JSON array that strictly follows the provided schema. Do not include any text outside the JSON block. Ensure the quiz is engaging and educational. Provide a brief explanation for each correct answer.";
+
+        /**
+         * Sets the loading state of the UI.
+         * @param {boolean} isLoading 
+         */
+        function setLoading(isLoading) {
+            generateButton.disabled = isLoading;
+            if (isLoading) {
+                buttonText.textContent = 'Generating...';
+                loadingSpinner.classList.remove('hidden');
+                errorMessageDiv.classList.add('hidden');
+            } else {
+                buttonText.textContent = 'Generate New Quiz';
+                loadingSpinner.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Converts base64 image data to a URL. Not strictly needed for this text-based quiz, 
+         * but good practice for API processing.
+         * @param {string} base64String 
+         * @param {string} mimeType 
+         * @returns {string}
+         */
+        function base64ToDataURL(base64String, mimeType) {
+            return `data:${mimeType};base64,${base64String}`;
+        }
+        
+        /**
+         * Implements exponential backoff for API retries.
+         * @param {function} fn - The function to execute.
+         * @param {number} maxRetries - Maximum number of retries.
+         * @returns {Promise<any>}
+         */
+        async function withExponentialBackoff(fn, maxRetries = 5) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    return await fn();
+                } catch (error) {
+                    if (i === maxRetries - 1) throw error;
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        /**
+         * Calls the Gemini API to generate the quiz content.
+         */
+        window.generateQuiz = async function() {
+            setLoading(true);
+            quizContainer.innerHTML = '';
+            quizFooter.classList.add('hidden');
+            resultsDiv.classList.add('hidden');
+            userAnswers = {};
+            isSubmitted = false;
+
+            const count = document.getElementById('questionCount').value;
+            const difficulty = document.getElementById('difficulty').value;
+            const topic = document.getElementById('quizTopic').value;
+
+            const userQuery = `Create a ${count}-question multiple-choice quiz about ${topic}. The difficulty should be ${difficulty}. For each question, provide the idiom and four options for its meaning.`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                },
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                }
+            };
+            
+            // NOTE: The API key is injected by the Canvas environment.
+            const apiKey = ""; 
+            const apiUrl = `${API_URL}?key=${apiKey}`;
+
+            try {
+                const fetcher = async () => {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(`API call failed with status ${response.status}: ${JSON.stringify(errorData)}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    const candidate = result.candidates?.[0];
+                    if (!candidate || !candidate.content?.parts?.[0]?.text) {
+                        throw new Error("Invalid response structure from API.");
+                    }
+
+                    const jsonText = candidate.content.parts[0].text;
+                    // Attempt to parse the JSON text
+                    try {
+                        quizQuestions = JSON.parse(jsonText);
+                        renderQuiz(quizQuestions);
+                        quizFooter.classList.remove('hidden');
+                    } catch (e) {
+                        console.error("Failed to parse JSON content:", jsonText, e);
+                        throw new Error("AI generated invalid JSON structure.");
+                    }
+                };
+
+                await withExponentialBackoff(fetcher);
+
+            } catch (error) {
+                console.error("Error generating quiz:", error);
+                errorMessageDiv.classList.remove('hidden');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        /**
+         * Renders the quiz questions to the UI.
+         * @param {Array} questions - The array of question objects.
+         */
+        function renderQuiz(questions) {
+            quizContainer.innerHTML = '';
+            questions.forEach((q, index) => {
+                const questionElement = document.createElement('div');
+                questionElement.className = 'question-card bg-white p-6 rounded-xl';
+                questionElement.innerHTML = `
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                        ${index + 1}. What is the meaning of the idiom: "<span class="text-blue-600">${q.question}</span>"?
+                    </h3>
+                    <div id="options-${index}" class="space-y-3">
+                        ${q.options.map((option, optIndex) => `
+                            <label class="option-label block p-3 border border-gray-200 rounded-lg hover:border-blue-400">
+                                <input type="radio" name="question-${index}" value="${option}" data-q-index="${index}" class="mr-3" onclick="handleOptionSelect(event, ${index}, '${option.replace(/'/g, "\\'")}')" ${isSubmitted ? 'disabled' : ''}>
+                                ${option}
+                            </label>
+                        `).join('')}
+                    </div>
+                    <div id="feedback-${index}" class="mt-4 p-3 rounded-lg text-sm hidden"></div>
+                `;
+                quizContainer.appendChild(questionElement);
+            });
+        }
+
+        /**
+         * Handles a user selecting an option.
+         * @param {Event} event 
+         * @param {number} qIndex - Question index.
+         * @param {string} optionText - Selected option text.
+         */
+        window.handleOptionSelect = function(event, qIndex, optionText) {
+            if (isSubmitted) return;
+
+            // Update user answers
+            userAnswers[qIndex] = optionText;
+
+            // Visual feedback for selection
+            const optionContainer = document.getElementById(`options-${qIndex}`);
+            optionContainer.querySelectorAll('.option-label').forEach(label => {
+                label.classList.remove('selected-option');
+            });
+
+            const selectedLabel = event.target.closest('.option-label');
+            if (selectedLabel) {
+                selectedLabel.classList.add('selected-option');
+            }
+        }
+
+        /**
+         * Submits the quiz and displays the results.
+         */
+        window.submitQuiz = function() {
+            if (isSubmitted) return;
+            isSubmitted = true;
+            submitButton.disabled = true;
+
+            let correctCount = 0;
+            const totalQuestions = quizQuestions.length;
+
+            quizQuestions.forEach((q, index) => {
+                const userAnswer = userAnswers[index];
+                const isCorrect = userAnswer === q.answer;
+                const optionsContainer = document.getElementById(`options-${index}`);
+                const feedbackDiv = document.getElementById(`feedback-${index}`);
+
+                // Disable all radio buttons after submission
+                optionsContainer.querySelectorAll('input[type="radio"]').forEach(radio => radio.disabled = true);
+
+                // Check and highlight results
+                optionsContainer.querySelectorAll('.option-label').forEach(label => {
+                    const radio = label.querySelector('input');
+                    label.classList.remove('selected-option'); // Remove temporary selection highlight
+
+                    if (radio.value === q.answer) {
+                        // Highlight the correct answer
+                        label.classList.add('correct-answer');
+                    } else if (radio.value === userAnswer && !isCorrect) {
+                        // Highlight the incorrect user selection
+                        label.classList.add('incorrect-answer');
+                    }
+                });
+
+                // Provide explanation feedback
+                feedbackDiv.classList.remove('hidden');
+                if (isCorrect) {
+                    feedbackDiv.classList.add('bg-green-100', 'text-green-800');
+                    feedbackDiv.innerHTML = `
+                        <p class="font-bold">Correct!</p>
+                        <p>${q.explanation}</p>
+                    `;
+                    correctCount++;
+                } else {
+                    feedbackDiv.classList.add('bg-red-100', 'text-red-800');
+                    const userSelectedText = userAnswer ? `You selected: <strong>${userAnswer}</strong>. ` : '';
+                    feedbackDiv.innerHTML = `
+                        <p class="font-bold">Incorrect.</p>
+                        <p>${userSelectedText} The correct answer is: <strong>${q.answer}</strong>.</p>
+                        <p>Explanation: ${q.explanation}</p>
+                    `;
+                }
+            });
+
+            // Display final score
+            const scoreText = document.getElementById('scoreText');
+            scoreText.innerHTML = `You scored <span class="text-3xl font-bold text-blue-600">${correctCount}</span> out of ${totalQuestions} (${(correctCount / totalQuestions * 100).toFixed(0)}%).`;
+            resultsDiv.classList.remove('hidden');
+        }
+
+        // Initialize with a default quiz on load
+        window.onload = () => {
+             generateQuiz();
+        };
+
+    </script>
+</body>
+</html>
